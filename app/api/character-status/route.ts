@@ -3,21 +3,27 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    // 環境変数の確認
-    console.log('環境変数チェック:', {
-      hasProjectId: !!process.env.GOOGLE_PROJECT_ID,
-      hasPrivateKeyId: !!process.env.GOOGLE_PRIVATE_KEY_ID,
-      hasPrivateKey: !!process.env.GOOGLE_PRIVATE_KEY,
-      hasClientEmail: !!process.env.GOOGLE_CLIENT_EMAIL,
-      hasClientId: !!process.env.GOOGLE_CLIENT_ID,
-      hasSpreadsheetId: !!process.env.SPREADSHEET_ID,
-      privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length || 0,
-    })
+    let auth;
     
-    // エラーの早期キャッチ
-    if (!process.env.GOOGLE_PRIVATE_KEY) {
-      throw new Error('GOOGLE_PRIVATE_KEY is not set in environment variables');
-    }
+    // オプション1: Base64エンコードされたJSONキーを使用
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64) {
+      console.log('Using Base64 encoded service account key');
+      try {
+        const decoded = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64, 'base64').toString('utf-8');
+        const serviceAccountKey = JSON.parse(decoded);
+        
+        auth = new google.auth.GoogleAuth({
+          credentials: serviceAccountKey,
+          scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+        });
+      } catch (e) {
+        console.error('Failed to decode Base64 key:', e);
+        throw new Error('Invalid Base64 encoded service account key');
+      }
+    } 
+    // オプション2: 個別の環境変数を使用（現在の方法）
+    else if (process.env.GOOGLE_PRIVATE_KEY) {
+      console.log('Using individual environment variables');
 
     // 秘密鍵の処理を改善
     let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
@@ -65,22 +71,25 @@ export async function GET() {
       first100: privateKey.substring(0, 100),
     });
 
-    // Google Sheets APIの認証設定
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        type: 'service_account',
-        project_id: process.env.GOOGLE_PROJECT_ID,
-        private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-        private_key: privateKey,
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-        token_uri: 'https://oauth2.googleapis.com/token',
-        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-        client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL,
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-    })
+      // Google Sheets APIの認証設定
+      auth = new google.auth.GoogleAuth({
+        credentials: {
+          type: 'service_account',
+          project_id: process.env.GOOGLE_PROJECT_ID,
+          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+          private_key: privateKey,
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+          token_uri: 'https://oauth2.googleapis.com/token',
+          auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+          client_x509_cert_url: process.env.GOOGLE_CLIENT_CERT_URL,
+        },
+        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      });
+    } else {
+      throw new Error('No authentication credentials found. Set either GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 or individual environment variables.');
+    }
 
     const sheets = google.sheets({ version: 'v4', auth })
     
