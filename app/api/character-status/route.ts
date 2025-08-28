@@ -14,13 +14,34 @@ export async function GET() {
       privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length || 0,
     })
 
+    // 秘密鍵の処理を改善
+    let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
+    
+    // Vercelの環境変数では改行がエスケープされている場合がある
+    if (privateKey.includes('\\n')) {
+      privateKey = privateKey.replace(/\\n/g, '\n');
+    }
+    
+    // 改行文字が正しく含まれているか確認
+    if (!privateKey.includes('\n')) {
+      console.error('秘密鍵に改行文字が含まれていません。環境変数の設定を確認してください。');
+    }
+    
+    console.log('秘密鍵の処理:', {
+      originalLength: process.env.GOOGLE_PRIVATE_KEY?.length,
+      processedLength: privateKey.length,
+      hasNewlines: privateKey.includes('\n'),
+      startsWithBegin: privateKey.startsWith('-----BEGIN'),
+      endsWithEnd: privateKey.includes('-----END'),
+    });
+
     // Google Sheets APIの認証設定
     const auth = new google.auth.GoogleAuth({
       credentials: {
         type: 'service_account',
         project_id: process.env.GOOGLE_PROJECT_ID,
         private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        private_key: privateKey,
         client_email: process.env.GOOGLE_CLIENT_EMAIL,
         client_id: process.env.GOOGLE_CLIENT_ID,
         auth_uri: 'https://accounts.google.com/o/oauth2/auth',
