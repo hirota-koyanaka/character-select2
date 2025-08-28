@@ -3,6 +3,17 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
+    // 環境変数の確認
+    console.log('環境変数チェック:', {
+      hasProjectId: !!process.env.GOOGLE_PROJECT_ID,
+      hasPrivateKeyId: !!process.env.GOOGLE_PRIVATE_KEY_ID,
+      hasPrivateKey: !!process.env.GOOGLE_PRIVATE_KEY,
+      hasClientEmail: !!process.env.GOOGLE_CLIENT_EMAIL,
+      hasClientId: !!process.env.GOOGLE_CLIENT_ID,
+      hasSpreadsheetId: !!process.env.SPREADSHEET_ID,
+      privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length || 0,
+    })
+
     // Google Sheets APIの認証設定
     const auth = new google.auth.GoogleAuth({
       credentials: {
@@ -26,12 +37,18 @@ export async function GET() {
     const spreadsheetId = process.env.SPREADSHEET_ID || ''
     const range = 'A:B' // A列:キャラクター名、B列:チェックボックス
     
+    console.log('スプレッドシートID:', spreadsheetId)
+    console.log('読み取り範囲:', range)
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range,
     })
 
     const rows = response.data.values || []
+    
+    console.log('取得したデータ行数:', rows.length)
+    console.log('最初の5行:', rows.slice(0, 5))
     
     // データを整形 (character1〜character24のチェック状態)
     const characterStatus: Record<string, boolean> = {}
@@ -41,14 +58,25 @@ export async function GET() {
         const characterKey = `character${index}`
         // チェックボックスの値（TRUE/FALSE）を判定
         characterStatus[characterKey] = row[1] === 'TRUE' || row[1] === true
+        if (row[1] === 'TRUE' || row[1] === true) {
+          console.log(`${characterKey} is checked`)
+        }
       }
     })
 
+    console.log('最終的なステータス:', characterStatus)
+    
     return NextResponse.json({ status: characterStatus })
   } catch (error) {
-    console.error('Google Sheets API エラー:', error)
+    console.error('Google Sheets API エラー詳細:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    })
     return NextResponse.json(
-      { error: 'データの取得に失敗しました' },
+      { 
+        error: 'データの取得に失敗しました',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }
