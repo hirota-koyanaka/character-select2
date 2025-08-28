@@ -13,6 +13,11 @@ export async function GET() {
       hasSpreadsheetId: !!process.env.SPREADSHEET_ID,
       privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length || 0,
     })
+    
+    // エラーの早期キャッチ
+    if (!process.env.GOOGLE_PRIVATE_KEY) {
+      throw new Error('GOOGLE_PRIVATE_KEY is not set in environment variables');
+    }
 
     // 秘密鍵の処理を改善
     let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
