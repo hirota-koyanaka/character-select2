@@ -17,22 +17,47 @@ export async function GET() {
     // 秘密鍵の処理を改善
     let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
     
-    // Vercelの環境変数では改行がエスケープされている場合がある
+    // デバッグ: 環境変数の最初の100文字を確認
+    console.log('Raw GOOGLE_PRIVATE_KEY (first 100 chars):', privateKey.substring(0, 100));
+    console.log('Raw key includes \\n?:', privateKey.includes('\\n'));
+    console.log('Raw key includes actual newline?:', privateKey.includes('\n'));
+    
+    // パターン1: ダブルクォートで囲まれている場合
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      console.log('Removing surrounding quotes');
+      privateKey = privateKey.slice(1, -1);
+    }
+    
+    // パターン2: \nがエスケープされている場合
     if (privateKey.includes('\\n')) {
+      console.log('Replacing escaped newlines');
       privateKey = privateKey.replace(/\\n/g, '\n');
     }
     
-    // 改行文字が正しく含まれているか確認
-    if (!privateKey.includes('\n')) {
-      console.error('秘密鍵に改行文字が含まれていません。環境変数の設定を確認してください。');
+    // パターン3: スペースで区切られている場合（Vercelの仕様）
+    if (!privateKey.includes('\n') && privateKey.includes('-----BEGIN')) {
+      console.log('Trying to fix space-separated key');
+      // PEMフォーマットの各行は64文字
+      const lines = [];
+      let currentPos = 0;
+      const keyContent = privateKey.replace('-----BEGIN PRIVATE KEY-----', '').replace('-----END PRIVATE KEY-----', '').trim();
+      
+      lines.push('-----BEGIN PRIVATE KEY-----');
+      while (currentPos < keyContent.length) {
+        lines.push(keyContent.substr(currentPos, 64));
+        currentPos += 64;
+      }
+      lines.push('-----END PRIVATE KEY-----');
+      privateKey = lines.join('\n');
     }
     
-    console.log('秘密鍵の処理:', {
-      originalLength: process.env.GOOGLE_PRIVATE_KEY?.length,
-      processedLength: privateKey.length,
+    console.log('秘密鍵の処理後:', {
+      length: privateKey.length,
       hasNewlines: privateKey.includes('\n'),
-      startsWithBegin: privateKey.startsWith('-----BEGIN'),
-      endsWithEnd: privateKey.includes('-----END'),
+      startsCorrectly: privateKey.startsWith('-----BEGIN'),
+      endsCorrectly: privateKey.includes('-----END'),
+      lineCount: privateKey.split('\n').length,
+      first100: privateKey.substring(0, 100),
     });
 
     // Google Sheets APIの認証設定
