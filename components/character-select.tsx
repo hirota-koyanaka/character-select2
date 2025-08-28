@@ -74,10 +74,48 @@ export default function CharacterSelect() {
     // 初回読み込み
     fetchCharacterStatus()
     
-    // 5秒ごとに更新
-    const interval = setInterval(fetchCharacterStatus, 5000)
+    // ページが表示されている時のみ5秒ごとに更新
+    let interval: NodeJS.Timeout | null = null
     
-    return () => clearInterval(interval)
+    const startInterval = () => {
+      // 既存のインターバルをクリア
+      if (interval) clearInterval(interval)
+      // 新しいインターバルを開始
+      interval = setInterval(fetchCharacterStatus, 5000)
+    }
+    
+    const stopInterval = () => {
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+    
+    // 可視性の変更を監視
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('ページが非表示になりました - 更新を停止')
+        stopInterval()
+      } else {
+        console.log('ページが表示されました - 更新を再開')
+        fetchCharacterStatus() // 表示時に即座に更新
+        startInterval()
+      }
+    }
+    
+    // 初期状態でページが表示されている場合のみインターバルを開始
+    if (!document.hidden) {
+      startInterval()
+    }
+    
+    // イベントリスナーを追加
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // クリーンアップ
+    return () => {
+      stopInterval()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   return (
